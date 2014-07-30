@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import argparse
+
+# directory that this file is in
+mydir = os.path.dirname(__file__)
+# directory of sitecustomize.py 
+startup_directory = os.path.join(mydir, '..', 'bottlerocket', 'startup')
+
+# add startup_directory to python path
+pp = os.environ.get('PYTHONPATH', '')
+if len(pp) > 0:
+    pp = os.pathsep + pp
+new_pythonpath = startup_directory + pp
+os.environ['PYTHONPATH'] = new_pythonpath
+
+# exec the python interpreter, which will inherit our environment
+python_exe = sys.executable
+args = [python_exe] + sys.argv[1:]
+os.execl(python_exe, *args)
