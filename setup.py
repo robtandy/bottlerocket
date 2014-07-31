@@ -19,5 +19,5 @@ setup(name='bottlerocket',
       packages=['bottlerocket', 'bottlerocket.startup', 
           'bottlerocket.instrumentation'],
       scripts=['bin/bottlerocket'],
-      install_requires=["pystaggregator >= 0.1.2"],
+      install_requires=["pystaggregator >= 0.1.2", "bottle >= 0.10.0"],
 )

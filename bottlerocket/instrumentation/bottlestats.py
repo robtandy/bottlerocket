@@ -44,13 +44,11 @@ my_hostname = platform.node() if len(platform.node()) > 0 else 'unknown_host'
 name_prefix = namespace + '.' + my_hostname + '.http.' 
 
 def before_hook():
-    print 'before_hook'
     t = Timer()
     request._bottlerocket_timer = t
     t.start()
 
 def after_hook():
-    print 'after hook'
     status = request._bottlerocket_exception_status
     if status is None:
         status = response.status_code
@@ -63,7 +61,6 @@ def after_hook():
 def exception_wrapper(callback):
     def wrapper(*args, **kwargs):
         try:
-            print 'exception_wrapper'
             request._bottlerocket_exception_status = None
             body = callback(*args, **kwargs)
             return body
@@ -82,7 +79,6 @@ _Router = Router
 class InstrumentedRouter(_Router):
     def match(self, environ):
         try:
-            print 'match'
             retval = _Router.match(self, environ)
             request._bottlerocket_exception_status = None
         except HTTPError as e:
@@ -95,7 +91,6 @@ bottle.Router = InstrumentedRouter
 _Bottle = Bottle
 class InstrumentedBottle(_Bottle):
     def __init__(self, catchall=True, autojson=True):
-        print 'Bottle()'
         _Bottle.__init__(self, catchall, autojson)
         self.add_hook('before_request', before_hook)
         self.add_hook('after_request', after_hook)
@@ -106,8 +101,6 @@ bottle.Bottle = InstrumentedBottle
 # patch the current Bottle() object that bottle puts on the AppStack
 # by default
 app[-1] = InstrumentedBottle()
-print type(app[-1])
-print type(app[-1].router)
 
 namespace = os.environ['BOTTLEROCKET_NAMESPACE']
 # connect to pystaggregator
