@@ -3,11 +3,12 @@
 import os
 import sys
 import argparse
+import bottlerocket
 
-# directory that this file is in
-mydir = os.path.dirname(__file__)
+# directory that bottlerocket is installed in 
+mydir = os.path.dirname(bottlerocket.__file__)
 # directory of sitecustomize.py 
-startup_directory = os.path.join(mydir, '..', 'bottlerocket', 'startup')
+startup_directory = os.path.join(mydir, 'startup')
 
 # add startup_directory to python path
 pp = os.environ.get('PYTHONPATH', '')
