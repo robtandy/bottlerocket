@@ -25,11 +25,11 @@ import time
 import os
 import sys
 import platform
-from pystaggregator.client import Timer, connect
+from pystaggregator.client import Timer, start
 
 # get the host and port number of pystaggregator
-host = os.environ.get('PYSTAGGREGATOR_HOST', 'localhost')
-port = os.environ.get('PYSTAGGREGATOR_PORT', 5201)
+url = os.environ.get('STAGGREGATOR_URL', 'http://localhost:5201/v1/stat')
+key = os.environ.get('STAGGREGATOR_KEY', None)
 
 # get our namespace for stats
 if not 'BOTTLEROCKET_NAMESPACE' in os.environ:
@@ -102,7 +102,6 @@ bottle.Bottle = InstrumentedBottle
 # by default
 app[-1] = InstrumentedBottle()
 
-namespace = os.environ['BOTTLEROCKET_NAMESPACE']
-# connect to pystaggregator
-connect(host, port)
+# start up pystaggregator client
+start(url, key)
 
