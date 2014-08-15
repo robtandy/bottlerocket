@@ -27,6 +27,8 @@ import sys
 import platform
 from pystaggregator.client import Timer, start
 
+BOTTLE_MINOR_VERSION = int(bottle.__version__.split('.')[1])
+
 # get the host and port number of pystaggregator
 url = os.environ.get('STAGGREGATOR_URL', 'http://localhost:5201/v1/stat')
 key = os.environ.get('STAGGREGATOR_KEY', None)
@@ -69,6 +71,11 @@ def exception_wrapper(callback):
             raise e
         except Exception as e:
             request._bottlerocket_exception_status = 500
+            
+            if BOTTLE_MINOR_VERSION < 12:
+                # we need to call it because prior to 0.12.0, exceptions
+                # raised in the callback don't call the after_request hook
+                after_hook()
             raise e
     return wrapper
 
@@ -83,8 +90,12 @@ class InstrumentedRouter(_Router):
             request._bottlerocket_exception_status = None
         except HTTPError as e:
             request._bottlerocket_exception_status = e.status_code
+            if BOTTLE_MINOR_VERSION < 12:
+                # we need to call it because prior to 0.12.0, exceptions
+                # raised in match don't call hooks
+                before_hook()
+                after_hook()
             raise e
-        
         return retval
 bottle.Router = InstrumentedRouter
 
@@ -92,10 +103,18 @@ _Bottle = Bottle
 class InstrumentedBottle(_Bottle):
     def __init__(self, catchall=True, autojson=True):
         _Bottle.__init__(self, catchall, autojson)
-        self.add_hook('before_request', before_hook)
-        self.add_hook('after_request', after_hook)
+
+        if BOTTLE_MINOR_VERSION > 12:
+            # > 0.12.0 way of adding hooks
+            self.add_hook('before_request', before_hook)
+            self.add_hook('after_request', after_hook)
+        else:
+            self.hook('before_request')(before_hook)
+            self.hook('after_request')(after_hook)
         
         self.install(exception_wrapper)
+
+
 bottle.Bottle = InstrumentedBottle
 
 # patch the current Bottle() object that bottle puts on the AppStack
