@@ -18,11 +18,23 @@ the bottle.Bottle class is replaced with one that installs these hooks
 and the Router upon initialization.  
 
 """
+import os
+
+# first, importantly, figure out if we need to import gevent and
+# monkey patch modules
+if 'BOTTLEROCKET_GEVENT' in os.environ:
+    to_patch = os.environ.get('BOTTLEROCKET_GEVENT').split(',')
+    import gevent.monkey
+    for func_name in to_patch:
+        func = getattr(gevent.monkey, func_name)
+        print('*** BOTTLEROCKET *** calling gevent.monkey.{}'.format(func_name))
+        func()
+
+
 from bottle import response, request, install, Bottle, Router, app, HTTPError,\
     HTTPResponse, AppStack
 import bottle
 import time
-import os
 import sys
 import platform
 from pystaggregator.client import Timer, start
@@ -59,7 +71,7 @@ def after_hook():
     request._bottlerocket_timer.end(name)
 
 # install this bottle plugin to run callbacks per usual and capture
-# any exceptions that may arrise.  Save them in 
+# any exceptions that may arise.  Save them in the thread local request
 def exception_wrapper(callback):
     def wrapper(*args, **kwargs):
         try:
@@ -121,6 +133,7 @@ bottle.Bottle = InstrumentedBottle
 # by default
 app[-1] = InstrumentedBottle()
 
-# start up pystaggregator client
+# start up pystaggregator client, which starts lazily after this when
+# first stat is sent
 start(url, key)
 
