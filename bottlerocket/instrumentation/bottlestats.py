@@ -9,6 +9,12 @@ The approach is to install a bottle plugin to wrap callbacks and take note
 of any uncaught exceptions and reraise them.  This lets us know about 500
 errors, or any http status attached to a raised HTTPResponse.
 
+See here: 
+http://www.markbetz.net/2014/04/30/re-raising-exceptions-in-python/
+regarding reraising (not wrapping) exceptions in python and preserving the
+stack trace.  We simply use 'raise' not 'raise e' where e is our caught
+exception.
+
 We also monkey patch the Router class to override match() so that we are
 aware of any 404 errors that are raised.  Timing is handled by the bottle 
 before_request and after_request hooks.
@@ -80,7 +86,7 @@ def exception_wrapper(callback):
             return body
         except HTTPResponse as e:
             request._bottlerocket_exception_status = e.status_code
-            raise e
+            raise
         except Exception as e:
             request._bottlerocket_exception_status = 500
             
@@ -88,7 +94,7 @@ def exception_wrapper(callback):
                 # we need to call it because prior to 0.12.0, exceptions
                 # raised in the callback don't call the after_request hook
                 after_hook()
-            raise e
+            raise
     return wrapper
 
 
@@ -107,7 +113,7 @@ class InstrumentedRouter(_Router):
                 # raised in match don't call hooks
                 before_hook()
                 after_hook()
-            raise e
+            raise
         return retval
 bottle.Router = InstrumentedRouter
 
