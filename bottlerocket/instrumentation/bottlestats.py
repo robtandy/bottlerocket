@@ -36,16 +36,11 @@ if 'BOTTLEROCKET_GEVENT' in os.environ:
         print('*** BOTTLEROCKET *** calling gevent.monkey.{}'.format(func_name))
         func()
 
-
-from bottle import response, request, install, Bottle, Router, app, HTTPError,\
-    HTTPResponse, AppStack
-import bottle
-import time
 import sys
+import re
 import platform
+import config
 from pystaggregator.client import Timer, start
-
-BOTTLE_MINOR_VERSION = int(bottle.__version__.split('.')[1])
 
 # get the host and port number of pystaggregator
 url = os.environ.get('STAGGREGATOR_URL', 'http://localhost:5201/v1/stat')
@@ -61,84 +56,20 @@ namespace = os.environ['BOTTLEROCKET_NAMESPACE']
 my_hostname = platform.node() if len(platform.node()) > 0 else 'unknown_host'
 
 # all stats begin with this prefix
-name_prefix = namespace + '.' + my_hostname + '.http.' 
+config.name_prefix = namespace + '.' + my_hostname + '.http.' 
 
-def before_hook():
-    t = Timer()
-    request._bottlerocket_timer = t
-    t.start()
+# get a list of all patterns if available
+config.patterns = []
+pattern_env = os.environ.get('BOTTLEROCKET_PATTERNS', '')
+if os.path.exists(pattern_env):
+    lines = [x.strip() for x in open(pattern_env).readlines()]
+    for line in lines:
+        name, pattern = line.split()
+        config.patterns.append((name, re.compile(pattern)))
 
-def after_hook():
-    status = request._bottlerocket_exception_status
-    if status is None:
-        status = response.status_code
-
-    name = name_prefix + request.method + '.' + str(status) + '.duration'
-    request._bottlerocket_timer.end(name)
-
-# install this bottle plugin to run callbacks per usual and capture
-# any exceptions that may arise.  Save them in the thread local request
-def exception_wrapper(callback):
-    def wrapper(*args, **kwargs):
-        try:
-            request._bottlerocket_exception_status = None
-            body = callback(*args, **kwargs)
-            return body
-        except HTTPResponse as e:
-            request._bottlerocket_exception_status = e.status_code
-            raise
-        except Exception as e:
-            request._bottlerocket_exception_status = 500
-            
-            if BOTTLE_MINOR_VERSION < 12:
-                # we need to call it because prior to 0.12.0, exceptions
-                # raised in the callback don't call the after_request hook
-                after_hook()
-            raise
-    return wrapper
-
-
-
-# Subclass bottle.Router because we need to capture any routing exceptions
-_Router = Router
-class InstrumentedRouter(_Router):
-    def match(self, environ):
-        try:
-            retval = _Router.match(self, environ)
-            request._bottlerocket_exception_status = None
-        except HTTPError as e:
-            request._bottlerocket_exception_status = e.status_code
-            if BOTTLE_MINOR_VERSION < 12:
-                # we need to call it because prior to 0.12.0, exceptions
-                # raised in match don't call hooks
-                before_hook()
-                after_hook()
-            raise
-        return retval
-bottle.Router = InstrumentedRouter
-
-_Bottle = Bottle
-class InstrumentedBottle(_Bottle):
-    def __init__(self, catchall=True, autojson=True):
-        _Bottle.__init__(self, catchall, autojson)
-
-        if BOTTLE_MINOR_VERSION > 12:
-            # > 0.12.0 way of adding hooks
-            self.add_hook('before_request', before_hook)
-            self.add_hook('after_request', after_hook)
-        else:
-            self.hook('before_request')(before_hook)
-            self.hook('after_request')(after_hook)
-        
-        self.install(exception_wrapper)
-
-
-bottle.Bottle = InstrumentedBottle
-
-# patch the current Bottle() object that bottle puts on the AppStack
-# by default
-app[-1] = InstrumentedBottle()
-
+# patch bottlerocket    
+import bottlerocket.patch.bottlepatch
+    
 # start up pystaggregator client, which starts lazily after this when
 # first stat is sent
 start(url, key)
