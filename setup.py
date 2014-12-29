@@ -17,7 +17,8 @@ setup(name='bottlerocket',
       (https://github.com/robtandy/staggregator) for aggregation and
       delivery to graphite.""",
       packages=['bottlerocket', 'bottlerocket.startup', 
-          'bottlerocket.instrumentation'],
+          'bottlerocket.instrumentation', 'bottlerocket.config', 
+          'bottlerocket.patch'],
       scripts=['bin/bottlerocket'],
       install_requires=["pystaggregator >= 0.3.1", "bottle >= 0.12.0"],
 )
