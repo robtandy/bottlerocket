@@ -17,9 +17,8 @@ def before_hook():
     t.start()
 
 def after_hook():
-    status = request._bottlerocket_exception_status
-    if status is None:
-        status = response.status_code
+    status = request._bottlerocket_status
+
     
     # check to see if we are using the short form name or long form name with
     # a pattern
@@ -41,18 +40,25 @@ def after_hook():
 # install this bottle plugin to run callbacks per usual and capture
 # any exceptions that may arise.  Save them in the thread local request
 def exception_wrapper(callback):
-    print('exception_wrapper()')
     def wrapper(*args, **kwargs):
         try:
-            print('hello')
-            request._bottlerocket_exception_status = None
-            body = callback(*args, **kwargs)
-            return body
+            request._bottlerocket_status = 200
+            retval = callback(*args, **kwargs)
+            
+            if isinstance(retval, HTTPResponse):
+                # capture the status code here, as HTTPResponses cn be raised
+                # or returned, remember
+                request._bottlerocket_status = retval.status_code
+            elif response.status_code != 200:
+                # it was set using the response.status property and needs to
+                # be captured
+                request._bottlerocket_status = response.status_code
+            return retval
         except HTTPResponse as e:
-            request._bottlerocket_exception_status = e.status_code
+            request._bottlerocket_status = e.status_code
             raise
         except Exception as e:
-            request._bottlerocket_exception_status = 500
+            request._bottlerocket_status = 500
             
             if BOTTLE_MINOR_VERSION < 12:
                 # we need to call it because prior to 0.12.0, exceptions
@@ -69,9 +75,8 @@ class InstrumentedRouter(_Router):
     def match(self, environ):
         try:
             retval = _Router.match(self, environ)
-            request._bottlerocket_exception_status = None
         except HTTPError as e:
-            request._bottlerocket_exception_status = e.status_code
+            request._bottlerocket_status = e.status_code
             if BOTTLE_MINOR_VERSION < 12:
                 # we need to call it because prior to 0.12.0, exceptions
                 # raised in match don't call hooks
@@ -84,7 +89,6 @@ bottle.Router = InstrumentedRouter
 _Bottle = Bottle
 class InstrumentedBottle(_Bottle):
     def __init__(self, catchall=True, autojson=True):
-        print('init')
         _Bottle.__init__(self, catchall, autojson)
 
         if BOTTLE_MINOR_VERSION >= 12:
@@ -95,14 +99,6 @@ class InstrumentedBottle(_Bottle):
             self.hook('before_request')(before_hook)
             self.hook('after_request')(after_hook)
         
-        def printhey(cb):
-            print('printhey()')
-            def wrap(*args,**kwargs):
-                print('hey')
-                return cb(*args, **kwargs)
-            return wrap
-
-        #self.install(printhey)
         self.install(exception_wrapper)
 
 

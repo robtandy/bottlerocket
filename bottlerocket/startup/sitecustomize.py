@@ -11,5 +11,4 @@ sys.path.insert(0, two_up)
 
 # import bottle stats
 from bottlerocket.instrumentation import bottlestats
-
 # proceed as normal from here
